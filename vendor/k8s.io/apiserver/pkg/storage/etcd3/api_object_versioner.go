@@ -17,6 +17,7 @@ limitations under the License.
 package etcd3
 
 import (
+	"fmt"
 	"strconv"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -45,21 +46,21 @@ func (a APIObjectVersioner) UpdateObject(obj runtime.Object, resourceVersion uin
 
 // UpdateList implements Versioner
 func (a APIObjectVersioner) UpdateList(obj runtime.Object, resourceVersion uint64, nextKey string, count *int64) error {
+	if resourceVersion == 0 {
+		return fmt.Errorf("illegal resource version from storage: %d", resourceVersion)
+	}
 	listAccessor, err := meta.ListAccessor(obj)
 	if err != nil || listAccessor == nil {
 		return err
 	}
-	versionString := ""
-	if resourceVersion != 0 {
-		versionString = strconv.FormatUint(resourceVersion, 10)
-	}
+	versionString := strconv.FormatUint(resourceVersion, 10)
 	listAccessor.SetResourceVersion(versionString)
 	listAccessor.SetContinue(nextKey)
 	listAccessor.SetRemainingItemCount(count)
 	return nil
 }
 
-// PrepareObjectForStorage clears resource version and self link prior to writing to etcd.
+// PrepareObjectForStorage clears resourceVersion and selfLink prior to writing to etcd.
 func (a APIObjectVersioner) PrepareObjectForStorage(obj runtime.Object) error {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
