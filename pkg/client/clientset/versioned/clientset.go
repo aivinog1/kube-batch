@@ -20,9 +20,11 @@ package versioned
 
 import (
 	"fmt"
+	"net/http"
 
+	schedulingv1 "github.com/kubernetes-sigs/kube-batch/pkg/client/clientset/versioned/typed/scheduling/v1"
 	schedulingv1alpha1 "github.com/kubernetes-sigs/kube-batch/pkg/client/clientset/versioned/typed/scheduling/v1alpha1"
-	schedulingv1alpha2 "github.com/kubernetes-sigs/kube-batch/pkg/client/clientset/versioned/typed/scheduling/v1alpha2"
+	schedulingv1beta1 "github.com/kubernetes-sigs/kube-batch/pkg/client/clientset/versioned/typed/scheduling/v1beta1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
@@ -31,7 +33,8 @@ import (
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	SchedulingV1alpha1() schedulingv1alpha1.SchedulingV1alpha1Interface
-	SchedulingV1alpha2() schedulingv1alpha2.SchedulingV1alpha2Interface
+	SchedulingV1beta1() schedulingv1beta1.SchedulingV1beta1Interface
+	SchedulingV1() schedulingv1.SchedulingV1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -39,7 +42,8 @@ type Interface interface {
 type Clientset struct {
 	*discovery.DiscoveryClient
 	schedulingV1alpha1 *schedulingv1alpha1.SchedulingV1alpha1Client
-	schedulingV1alpha2 *schedulingv1alpha2.SchedulingV1alpha2Client
+	schedulingV1beta1  *schedulingv1beta1.SchedulingV1beta1Client
+	schedulingV1       *schedulingv1.SchedulingV1Client
 }
 
 // SchedulingV1alpha1 retrieves the SchedulingV1alpha1Client
@@ -47,9 +51,14 @@ func (c *Clientset) SchedulingV1alpha1() schedulingv1alpha1.SchedulingV1alpha1In
 	return c.schedulingV1alpha1
 }
 
-// SchedulingV1alpha2 retrieves the SchedulingV1alpha2Client
-func (c *Clientset) SchedulingV1alpha2() schedulingv1alpha2.SchedulingV1alpha2Interface {
-	return c.schedulingV1alpha2
+// SchedulingV1beta1 retrieves the SchedulingV1beta1Client
+func (c *Clientset) SchedulingV1beta1() schedulingv1beta1.SchedulingV1beta1Interface {
+	return c.schedulingV1beta1
+}
+
+// SchedulingV1 retrieves the SchedulingV1Client
+func (c *Clientset) SchedulingV1() schedulingv1.SchedulingV1Interface {
+	return c.schedulingV1
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -63,26 +72,53 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 // NewForConfig creates a new Clientset for the given config.
 // If config's RateLimiter is not set and QPS and Burst are acceptable,
 // NewForConfig will generate a rate-limiter in configShallowCopy.
+// NewForConfig is equivalent to NewForConfigAndClient(c, httpClient),
+// where httpClient was generated with rest.HTTPClientFor(c).
 func NewForConfig(c *rest.Config) (*Clientset, error) {
 	configShallowCopy := *c
-	if configShallowCopy.RateLimiter == nil && configShallowCopy.QPS > 0 {
-		if configShallowCopy.Burst <= 0 {
-			return nil, fmt.Errorf("Burst is required to be greater than 0 when RateLimiter is not set and QPS is set to greater than 0")
-		}
-		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
+
+	if configShallowCopy.UserAgent == "" {
+		configShallowCopy.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	var cs Clientset
-	var err error
-	cs.schedulingV1alpha1, err = schedulingv1alpha1.NewForConfig(&configShallowCopy)
-	if err != nil {
-		return nil, err
-	}
-	cs.schedulingV1alpha2, err = schedulingv1alpha2.NewForConfig(&configShallowCopy)
+
+	// share the transport between all clients
+	httpClient, err := rest.HTTPClientFor(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
 
-	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
+	return NewForConfigAndClient(&configShallowCopy, httpClient)
+}
+
+// NewForConfigAndClient creates a new Clientset for the given config and http client.
+// Note the http client provided takes precedence over the configured transport values.
+// If config's RateLimiter is not set and QPS and Burst are acceptable,
+// NewForConfigAndClient will generate a rate-limiter in configShallowCopy.
+func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset, error) {
+	configShallowCopy := *c
+	if configShallowCopy.RateLimiter == nil && configShallowCopy.QPS > 0 {
+		if configShallowCopy.Burst <= 0 {
+			return nil, fmt.Errorf("burst is required to be greater than 0 when RateLimiter is not set and QPS is set to greater than 0")
+		}
+		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
+	}
+
+	var cs Clientset
+	var err error
+	cs.schedulingV1alpha1, err = schedulingv1alpha1.NewForConfigAndClient(&configShallowCopy, httpClient)
+	if err != nil {
+		return nil, err
+	}
+	cs.schedulingV1beta1, err = schedulingv1beta1.NewForConfigAndClient(&configShallowCopy, httpClient)
+	if err != nil {
+		return nil, err
+	}
+	cs.schedulingV1, err = schedulingv1.NewForConfigAndClient(&configShallowCopy, httpClient)
+	if err != nil {
+		return nil, err
+	}
+
+	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
 		return nil, err
 	}
@@ -92,19 +128,19 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 // NewForConfigOrDie creates a new Clientset for the given config and
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) *Clientset {
-	var cs Clientset
-	cs.schedulingV1alpha1 = schedulingv1alpha1.NewForConfigOrDie(c)
-	cs.schedulingV1alpha2 = schedulingv1alpha2.NewForConfigOrDie(c)
-
-	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
-	return &cs
+	cs, err := NewForConfig(c)
+	if err != nil {
+		panic(err)
+	}
+	return cs
 }
 
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
 	cs.schedulingV1alpha1 = schedulingv1alpha1.New(c)
-	cs.schedulingV1alpha2 = schedulingv1alpha2.New(c)
+	cs.schedulingV1beta1 = schedulingv1beta1.New(c)
+	cs.schedulingV1 = schedulingv1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

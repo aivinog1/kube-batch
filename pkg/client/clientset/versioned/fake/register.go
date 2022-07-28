@@ -19,8 +19,9 @@ limitations under the License.
 package fake
 
 import (
-	schedulingv1alpha1 "github.com/kubernetes-sigs/kube-batch/pkg/apis/scheduling/v1alpha1"
-	schedulingv1alpha2 "github.com/kubernetes-sigs/kube-batch/pkg/apis/scheduling/v1alpha2"
+	schedulingv1 "k8s.io/api/scheduling/v1"
+	schedulingv1alpha1 "k8s.io/api/scheduling/v1alpha1"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -30,10 +31,11 @@ import (
 
 var scheme = runtime.NewScheme()
 var codecs = serializer.NewCodecFactory(scheme)
-var parameterCodec = runtime.NewParameterCodec(scheme)
+
 var localSchemeBuilder = runtime.SchemeBuilder{
 	schedulingv1alpha1.AddToScheme,
-	schedulingv1alpha2.AddToScheme,
+	schedulingv1beta1.AddToScheme,
+	schedulingv1.AddToScheme,
 }
 
 // AddToScheme adds all types of this clientset into the given scheme. This allows composition

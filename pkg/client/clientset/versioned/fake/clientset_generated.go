@@ -20,10 +20,12 @@ package fake
 
 import (
 	clientset "github.com/kubernetes-sigs/kube-batch/pkg/client/clientset/versioned"
+	schedulingv1 "github.com/kubernetes-sigs/kube-batch/pkg/client/clientset/versioned/typed/scheduling/v1"
+	fakeschedulingv1 "github.com/kubernetes-sigs/kube-batch/pkg/client/clientset/versioned/typed/scheduling/v1/fake"
 	schedulingv1alpha1 "github.com/kubernetes-sigs/kube-batch/pkg/client/clientset/versioned/typed/scheduling/v1alpha1"
 	fakeschedulingv1alpha1 "github.com/kubernetes-sigs/kube-batch/pkg/client/clientset/versioned/typed/scheduling/v1alpha1/fake"
-	schedulingv1alpha2 "github.com/kubernetes-sigs/kube-batch/pkg/client/clientset/versioned/typed/scheduling/v1alpha2"
-	fakeschedulingv1alpha2 "github.com/kubernetes-sigs/kube-batch/pkg/client/clientset/versioned/typed/scheduling/v1alpha2/fake"
+	schedulingv1beta1 "github.com/kubernetes-sigs/kube-batch/pkg/client/clientset/versioned/typed/scheduling/v1beta1"
+	fakeschedulingv1beta1 "github.com/kubernetes-sigs/kube-batch/pkg/client/clientset/versioned/typed/scheduling/v1beta1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
@@ -76,14 +78,22 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 	return c.tracker
 }
 
-var _ clientset.Interface = &Clientset{}
+var (
+	_ clientset.Interface = &Clientset{}
+	_ testing.FakeClient  = &Clientset{}
+)
 
 // SchedulingV1alpha1 retrieves the SchedulingV1alpha1Client
 func (c *Clientset) SchedulingV1alpha1() schedulingv1alpha1.SchedulingV1alpha1Interface {
 	return &fakeschedulingv1alpha1.FakeSchedulingV1alpha1{Fake: &c.Fake}
 }
 
-// SchedulingV1alpha2 retrieves the SchedulingV1alpha2Client
-func (c *Clientset) SchedulingV1alpha2() schedulingv1alpha2.SchedulingV1alpha2Interface {
-	return &fakeschedulingv1alpha2.FakeSchedulingV1alpha2{Fake: &c.Fake}
+// SchedulingV1beta1 retrieves the SchedulingV1beta1Client
+func (c *Clientset) SchedulingV1beta1() schedulingv1beta1.SchedulingV1beta1Interface {
+	return &fakeschedulingv1beta1.FakeSchedulingV1beta1{Fake: &c.Fake}
+}
+
+// SchedulingV1 retrieves the SchedulingV1Client
+func (c *Clientset) SchedulingV1() schedulingv1.SchedulingV1Interface {
+	return &fakeschedulingv1.FakeSchedulingV1{Fake: &c.Fake}
 }

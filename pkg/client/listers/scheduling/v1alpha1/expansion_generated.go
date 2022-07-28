@@ -18,14 +18,6 @@ limitations under the License.
 
 package v1alpha1
 
-// PodGroupListerExpansion allows custom methods to be added to
-// PodGroupLister.
-type PodGroupListerExpansion interface{}
-
-// PodGroupNamespaceListerExpansion allows custom methods to be added to
-// PodGroupNamespaceLister.
-type PodGroupNamespaceListerExpansion interface{}
-
-// QueueListerExpansion allows custom methods to be added to
-// QueueLister.
-type QueueListerExpansion interface{}
+// PriorityClassListerExpansion allows custom methods to be added to
+// PriorityClassLister.
+type PriorityClassListerExpansion interface{}

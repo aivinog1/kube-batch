@@ -15,6 +15,12 @@ Refer to [tutorial](doc/usage/tutorial.md) on how to use `kube-batch` to run bat
 
 The following figure describes the overall architecture and scope of `kube-batch`; the out-of-scope part is going to be handled by other projects.
 
+### How to regenerate the client API code
+You can use this command:
+```shell
+./vendor/k8s.io/code-generator/generate-groups.sh all github.com/kubernetes-sigs/kube-batch/pkg/client k8s.io/api "scheduling:v1alpha1,v1beta1,v1"
+```
+
 ![kube-batch](doc/images/kube-batch.png)
 
 ## Who uses kube-batch?
